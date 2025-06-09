@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stats-card {
+            text-align: center;
+        }
+
+        .stats-card h3 {
+            color: #666;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .stats-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .income { color: #10b981; }
+        .expense { color: #ef4444; }
+        .balance { color: #3b82f6; }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        .recent-transactions {
+            grid-column: 1 / -1;
+        }
+
+        .transaction-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            transition: background 0.3s ease;
+        }
+
+        .transaction-item:hover {
+            background: #f8f9fa;
+        }
+
+        .transaction-info h4 {
+            margin-bottom: 0.25rem;
+        }
+
+        .transaction-info p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .transaction-amount {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .nav-content {
+                padding: 0 1rem;
+            }
+            
+            .nav-links {
+                gap: 1rem;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">💰 Expense Tracker</div>
+            <div class="nav-links">
+                <a href="/" class="active">Dashboard</a>
+                <a href="/transactions">Transactions</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div id="loading" class="loading">Loading dashboard...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="dashboard" style="display: none;">
+            <div class="dashboard-grid">
+                <div class="card stats-card">
+                    <h3>Total Income</h3>
+                    <div id="totalIncome" class="stats-value income">₹0</div>
+                </div>
+                
+                <div class="card stats-card">
+                    <h3>Total Expenses</h3>
+                    <div id="totalExpense" class="stats-value expense">₹0</div>
+                </div>
+                
+                <div class="card stats-card">
+                    <h3>Balance</h3>
+                    <div id="balance" class="stats-value balance">₹0</div>
+                </div>
+                
+                <div class="card">
+                    <h3>Expenses by Category</h3>
+                    <div class="chart-container">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>Monthly Trends</h3>
+                    <div class="chart-container">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="card recent-transactions">
+                    <h3>Recent Transactions</h3>
+                    <div id="recentTransactions" class="transaction-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pieChart, lineChart;
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/dashboard');
+                if (!response.ok) throw new Error('Failed to fetch dashboard data');
+                
+                const data = await response.json();
+                
+                // Update stats
+                document.getElementById('totalIncome').textContent = `₹${data.totalIncome.toLocaleString()}`;
+                document.getElementById('totalExpense').textContent = `₹${data.totalExpense.toLocaleString()}`;
+                document.getElementById('balance').textContent = `₹${data.balance.toLocaleString()}`;
+                
+                // Update balance color based on value
+                const balanceElement = document.getElementById('balance');
+                balanceElement.className = `stats-value ${data.balance >= 0 ? 'income' : 'expense'}`;
+                
+                // Create pie chart
+                createPieChart(data.categoryData);
+                
+                // Create line chart
+                createLineChart(data.monthlyData);
+                
+                // Display recent transactions
+                displayRecentTransactions(data.recentTransactions);
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                showError('Failed to load dashboard data. Please try again.');
+            }
+        }
+
+        function createPieChart(categoryData) {
+            const ctx = document.getElementById('pieChart').getContext('2d');
+            
+            if (pieChart) pieChart.destroy();
+            
+            const labels = Object.keys(categoryData);
+            const data = Object.values(categoryData);
+            const colors = [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+            ];
+            
+            if (labels.length === 0) {
+                ctx.font = '16px Arial';
+                ctx.fillStyle = '#666';
+                ctx.textAlign = 'center';
+                ctx.fillText('No expense data available', ctx.canvas.width/2, ctx.canvas.height/2);
+                return;
+            }
+            
+            pieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        }
+                    }
+                }
+            });
+        }
+
+        function createLineChart(monthlyData) {
+            const ctx = document.getElementById('lineChart').getContext('2d');
+            
+            if (lineChart) lineChart.destroy();
+            
+            const months = Object.keys(monthlyData).sort();
+            const incomeData = months.map(month => monthlyData[month].income);
+            const expenseData = months.map(month => monthlyData[month].expense);
+            
+            if (months.length === 0) {
+                ctx.font = '16px Arial';
+                ctx.fillStyle = '#666';
+                ctx.textAlign = 'center';
+                ctx.fillText('No transaction data available', ctx.canvas.width/2, ctx.canvas.height/2);
+                return;
+            }
+            
+            lineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            label: 'Income',
+                            data: incomeData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Expenses',
+                            data: expenseData,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '₹' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayRecentTransactions(transactions) {
+            const container = document.getElementById('recentTransactions');
+            
+            if (transactions.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #666; padding: 2rem;">No transactions found</p>';
+                return;
+            }
+            
+            container.innerHTML = transactions.map(transaction => `
+                <div class="transaction-item">
+                    <div class="transaction-info">
+                        <h4>${transaction.category}</h4>
+                        <p>${transaction.date} • ${transaction.type}</p>
+                    </div>
+                    <div class="transaction-amount ${transaction.type === 'Income' ? 'income' : 'expense'}">
+                        ${transaction.type === 'Income' ? '+' : '-'}₹${transaction.amount.toLocaleString()}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Load dashboard when page loads
+        document.addEventListener('DOMContentLoaded', loadDashboard);
+    </script>
+</body>
+</html>
